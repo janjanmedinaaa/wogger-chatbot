@@ -80,10 +80,39 @@ const sendAttachment = (id, type, url) => {
   return sendToMessenger(body)
 }
 
+const sendUrl = (id, items) => {
+  let body = {
+    recipient: { id },
+    message: {
+      attachment: {
+        type: 'template', 
+        payload: {
+          template_type: 'generic', 
+          elements: items.map(item => {
+            item['buttons'] = [
+              {
+                type: 'web_url',
+                title: 'Visit Website',
+                url: item.url
+              }
+            ];
+
+            delete item.url;
+            return item;
+          })
+        }
+      }
+    }
+  }
+
+  return sendToMessenger(body)
+}
+
 module.exports = {
   sendMessage,
   sendAction,
   sendAttachment,
+  sendUrl,
 
   SenderAction,
   MessageAttachment

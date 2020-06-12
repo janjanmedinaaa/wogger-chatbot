@@ -1,8 +1,19 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const Messenger = require('./utils/messenger');
-require('dotenv').config();
+const { 
+  QuickReplies, 
+  Repositories,
+  GetStartedMessages,
+  HowToUseMessages,
+  WoggerKeyMessage,
+  DefaultMessage,
+  Payload
+} = require('./utils/constants');
 
+require('./utils/mapAsync');
+require('dotenv').config();
+  
 const SenderAction = require('./utils/messenger').SenderAction;
 
 const app = express().use(bodyParser.json());
@@ -23,26 +34,68 @@ app.post('/', async(req, res) => {
 
       // Get User Id and Message
       let senderUserId = messages.sender.id;
-
-      let messageToReply1 = 'Here is your Wogger key:'
-      let messageToReply2 = 'Add this key to your Project to receive Messages from your Development Logs.'
-      let messageToReply3 = 'Have fun Debugging!'
+      let message = messages.message;
+      let postback = messages.postback;
 
       // Acknowledge Messages received by notifying the user that
-      // you have seen the message and adding a typing indicator if 
+      // you have seen the message and adding a typing indicator if
       // you're planning to reply
       await Messenger.sendAction(senderUserId, SenderAction.MARK_SEEN);
       await Messenger.sendAction(senderUserId, SenderAction.TYPING_ON);
 
-      // For now, this returns the received message to the user
-      // Await is necessary here since Vercel doesn't process data anymore
-      // after sending the response to the user
-      await Messenger.sendMessage(senderUserId, `${messageToReply1} ${senderUserId}`);
-      await Messenger.sendAction(senderUserId, SenderAction.TYPING_ON);
-      await Messenger.sendMessage(senderUserId, messageToReply2);
-      await Messenger.sendAction(senderUserId, SenderAction.TYPING_ON);
-      await Messenger.sendMessage(senderUserId, messageToReply3);
+      if (message != undefined) {
 
+        // Handle Quick Replies
+        if (message.quick_reply != undefined) {
+          switch (message.quick_reply.payload) {
+            case Payload.GET_WOGGER_KEY:
+              await Messenger.sendMessage(
+                senderUserId, 
+                `${WoggerKeyMessage} ${senderUserId}`,
+                QuickReplies
+              );
+              break;
+
+            case Payload.CHECK_SOURCE_CODE:
+              await Messenger.sendUrl(senderUserId, Repositories);
+              break;
+
+            case Payload.HOW_TO_USE:
+              await HowToUseMessages.mapAsync(async (message, index, size) => {
+                if (index != size - 1) {
+                  await Messenger.sendMessage(senderUserId, message);
+                  await Messenger.sendAction(senderUserId, SenderAction.TYPING_ON);
+                } else {
+                  await Messenger.sendMessage(senderUserId, message, QuickReplies);
+                }
+              });
+              break;
+          }
+
+          await Messenger.sendAction(senderUserId, SenderAction.TYPING_OFF);
+          return res.status(200).send('EVENT_RECEIVED');
+        } 
+        
+        await Messenger.sendMessage(
+          senderUserId, 
+          DefaultMessage,
+          QuickReplies
+        );
+      } else if (postback != undefined) {
+
+        // Handle any Postback Messages
+        await Messenger.sendMessage(senderUserId, `${WoggerKeyMessage} ${senderUserId}`);
+        await GetStartedMessages.mapAsync(async (message, index, size) => {
+          if (index != size - 1) {
+            await Messenger.sendMessage(senderUserId, message);
+            await Messenger.sendAction(senderUserId, SenderAction.TYPING_ON);
+          } else {
+            await Messenger.sendMessage(senderUserId, message, QuickReplies);
+          }
+        });
+      }
+
+      await Messenger.sendAction(senderUserId, SenderAction.TYPING_OFF);
       return res.status(200).send('EVENT_RECEIVED');
     });
   } else {
