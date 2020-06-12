@@ -89,6 +89,7 @@ const sendUrl = (id, items) => {
         payload: {
           template_type: 'generic', 
           elements: items.map(item => {
+            item = {...item}
             item['buttons'] = [
               {
                 type: 'web_url',
